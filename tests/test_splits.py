@@ -312,7 +312,7 @@ class TestAccidentYearSplit:
         rng = np.random.default_rng(99)
         base = make_liability_df(end="2022-12-31")
         # Recent rows with only 1 month of development - immature
-        recent_dates = pd.date_range("2023-01-01", "2023-06-30", freq="ME")
+        recent_dates = pd.date_range("2023-01-01", "2023-06-30", freq="MS")
         recent = pl.DataFrame(
             {
                 "accident_date": recent_dates.tolist(),
@@ -337,7 +337,7 @@ class TestAccidentYearSplit:
         """Only one qualifying year means we can't form a train/test pair."""
         df = pl.DataFrame(
             {
-                "accident_date": pd.date_range("2022-01-01", "2022-12-31", freq="ME").tolist(),
+                "accident_date": pd.date_range("2022-01-01", "2022-12-31", freq="MS").tolist(),
                 "development_months": [24] * 12,
                 "incurred": [10000.0] * 12,
             }

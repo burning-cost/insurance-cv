@@ -8,11 +8,12 @@ training data, and a 3-month IBNR buffer prevents partially-developed claims
 from polluting the test evaluation.
 
 Run this on Databricks or any environment with CatBoost installed:
-    uv pip install insurance-cv catboost
+    uv pip install insurance-cv catboost polars
 """
 
 import numpy as np
-import pandas as pd
+import polars as pl
+from datetime import date, timedelta
 
 from insurance_cv import walk_forward_split
 from insurance_cv.diagnostics import split_summary, temporal_leakage_check
@@ -30,23 +31,34 @@ from insurance_cv.splits import InsuranceCV
 rng = np.random.default_rng(42)
 n = 10_000
 
-dates = pd.date_range("2018-01-01", "2023-12-31", freq="D")
-inception_dates = pd.to_datetime(rng.choice(dates, size=n, replace=True))
+# Generate date range as a list of Python date objects
+start = date(2018, 1, 1)
+end = date(2023, 12, 31)
+total_days = (end - start).days + 1
+day_offsets = rng.integers(0, total_days, size=n)
+inception_dates = [start + timedelta(days=int(d)) for d in day_offsets]
 
-df = pd.DataFrame(
-    {
-        "inception_date": inception_dates,
-        "vehicle_age": rng.integers(0, 15, n),
-        "driver_age": rng.integers(17, 80, n),
-        "ncd_years": rng.integers(0, 10, n),
-        "area_code": rng.choice(["A", "B", "C", "D"], n),
-        "earned_vehicle_years": rng.uniform(0.5, 1.0, n),
-        "claim_count": rng.poisson(0.08, n),
-    }
-).sort_values("inception_date").reset_index(drop=True)
+df = (
+    pl.DataFrame(
+        {
+            "inception_date": inception_dates,
+            "vehicle_age": rng.integers(0, 15, n).tolist(),
+            "driver_age": rng.integers(17, 80, n).tolist(),
+            "ncd_years": rng.integers(0, 10, n).tolist(),
+            "area_code": rng.choice(["A", "B", "C", "D"], n).tolist(),
+            "earned_vehicle_years": rng.uniform(0.5, 1.0, n).tolist(),
+            "claim_count": rng.poisson(0.08, n).tolist(),
+        }
+    )
+    .with_columns(pl.col("inception_date").cast(pl.Date))
+    .sort("inception_date")
+)
 
-print(f"Dataset: {len(df):,} policies from {df['inception_date'].min():%Y-%m} to {df['inception_date'].max():%Y-%m}")
-print(f"Overall frequency: {df['claim_count'].sum() / df['earned_vehicle_years'].sum():.4f}")
+min_date = df["inception_date"].min()
+max_date = df["inception_date"].max()
+total_freq = df["claim_count"].sum() / df["earned_vehicle_years"].sum()
+print(f"Dataset: {len(df):,} policies from {min_date} to {max_date}")
+print(f"Overall frequency: {total_freq:.4f}")
 
 # ---------------------------------------------------------------------------
 # Define splits
@@ -76,72 +88,75 @@ if check["warnings"]:
 
 summary = split_summary(splits, df, date_col="inception_date")
 print("Split summary:")
-print(summary[["fold", "train_n", "test_n", "train_end", "test_start", "gap_days"]].to_string(index=False))
+print(summary.select(["fold", "train_n", "test_n", "train_end", "test_start", "gap_days"]))
 print()
 
 # ---------------------------------------------------------------------------
-# Fit a frequency model per fold
+# Fit a CatBoost frequency model per fold (sklearn CV interface)
 # ---------------------------------------------------------------------------
-# Uncomment the CatBoost section if catboost is installed.
-# This section shows the pattern - InsuranceCV plugs directly into sklearn CV.
+# InsuranceCV plugs directly into sklearn's cross_val_score. CatBoost's
+# Poisson loss function is the right choice for claim frequency modelling.
 # ---------------------------------------------------------------------------
 
-# try:
-#     import catboost
-#     from sklearn.model_selection import cross_val_score
-#
-#     features = ["vehicle_age", "driver_age", "ncd_years"]
-#     X = df[features].values
-#     y = df["claim_count"].values
-#
-#     cv = InsuranceCV(splits, df)
-#
-#     model = catboost.CatBoostRegressor(
-#         loss_function="Poisson",
-#         iterations=300,
-#         learning_rate=0.05,
-#         depth=6,
-#         random_seed=42,
-#         verbose=0,
-#     )
-#
-#     scores = cross_val_score(
-#         model, X, y,
-#         cv=cv,
-#         scoring="neg_mean_poisson_deviance",
-#     )
-#
-#     print(f"Mean Poisson deviance across {len(scores)} folds: {-scores.mean():.4f} (+/- {scores.std():.4f})")
-#
-# except ImportError:
-#     print("CatBoost not installed - skipping model fit.")
+try:
+    import catboost
+    from sklearn.model_selection import cross_val_score
+
+    features = ["vehicle_age", "driver_age", "ncd_years"]
+    X = df.select(features).to_numpy()
+    y = df["claim_count"].to_numpy()
+
+    cv = InsuranceCV(splits, df)
+
+    model = catboost.CatBoostRegressor(
+        loss_function="Poisson",
+        iterations=300,
+        learning_rate=0.05,
+        depth=6,
+        random_seed=42,
+        verbose=0,
+    )
+
+    scores = cross_val_score(
+        model, X, y,
+        cv=cv,
+        scoring="neg_mean_poisson_deviance",
+    )
+
+    print(f"CatBoost Poisson deviance across {len(scores)} folds: {-scores.mean():.4f} (+/- {scores.std():.4f})")
+
+except ImportError:
+    print("CatBoost not installed - skipping model fit. Install with: uv pip install catboost")
 
 # ---------------------------------------------------------------------------
 # Manual fold iteration (if you need exposure-weighted evaluation)
+# ---------------------------------------------------------------------------
+# cross_val_score doesn't support sample weights in the scoring step. For
+# exposure-weighted deviance you need to iterate folds manually.
 # ---------------------------------------------------------------------------
 
 fold_results = []
 for i, split in enumerate(splits):
     train_idx, test_idx = split.get_indices(df)
-    train = df.iloc[train_idx]
-    test = df.iloc[test_idx]
+    train = df[train_idx]
+    test = df[test_idx]
 
     # Baseline: predict overall train frequency for every test row
     train_freq = train["claim_count"].sum() / train["earned_vehicle_years"].sum()
     predicted = test["earned_vehicle_years"] * train_freq
     actual = test["claim_count"]
 
-    mae = np.abs(actual - predicted).mean()
+    mae = float((actual - predicted).abs().mean())
     fold_results.append(
         {
             "fold": i + 1,
             "train_size": len(train),
             "test_size": len(test),
-            "train_frequency": train_freq,
-            "baseline_mae": mae,
+            "train_frequency": round(train_freq, 5),
+            "baseline_mae": round(mae, 5),
         }
     )
 
-results_df = pd.DataFrame(fold_results)
+results_df = pl.DataFrame(fold_results)
 print("Baseline (constant frequency) results per fold:")
-print(results_df.to_string(index=False))
+print(results_df)
