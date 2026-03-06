@@ -1,14 +1,14 @@
 """
 Walk-forward cross-validation for a UK motor pricing model.
 
-This example shows how to use insurance-cv with a LightGBM frequency model
+This example shows how to use insurance-cv with a CatBoost frequency model
 on synthetic motor data. The key point is that the CV results here actually
 reflect prospective performance — the test sets are always later than the
 training data, and a 3-month IBNR buffer prevents partially-developed claims
 from polluting the test evaluation.
 
-Run this on Databricks or any environment with LightGBM installed:
-    pip install insurance-cv lightgbm
+Run this on Databricks or any environment with CatBoost installed:
+    uv pip install insurance-cv catboost
 """
 
 import numpy as np
@@ -82,12 +82,12 @@ print()
 # ---------------------------------------------------------------------------
 # Fit a frequency model per fold
 # ---------------------------------------------------------------------------
-# Uncomment the LightGBM section if lightgbm is installed.
+# Uncomment the CatBoost section if catboost is installed.
 # This section shows the pattern — InsuranceCV plugs directly into sklearn CV.
 # ---------------------------------------------------------------------------
 
 # try:
-#     import lightgbm as lgb
+#     import catboost
 #     from sklearn.model_selection import cross_val_score
 #
 #     features = ["vehicle_age", "driver_age", "ncd_years"]
@@ -96,11 +96,13 @@ print()
 #
 #     cv = InsuranceCV(splits, df)
 #
-#     model = lgb.LGBMRegressor(
-#         objective="poisson",
-#         n_estimators=200,
+#     model = catboost.CatBoostRegressor(
+#         loss_function="Poisson",
+#         iterations=300,
 #         learning_rate=0.05,
-#         num_leaves=31,
+#         depth=6,
+#         random_seed=42,
+#         verbose=0,
 #     )
 #
 #     scores = cross_val_score(
@@ -112,7 +114,7 @@ print()
 #     print(f"Mean Poisson deviance across {len(scores)} folds: {-scores.mean():.4f} (+/- {scores.std():.4f})")
 #
 # except ImportError:
-#     print("LightGBM not installed — skipping model fit.")
+#     print("CatBoost not installed — skipping model fit.")
 
 # ---------------------------------------------------------------------------
 # Manual fold iteration (if you need exposure-weighted evaluation)

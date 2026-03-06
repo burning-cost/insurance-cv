@@ -3,7 +3,7 @@
 Temporal cross-validation for insurance pricing models. Walk-forward splits that respect policy year, accident year, and IBNR development structure.
 
 ```bash
-pip install insurance-cv
+uv pip install insurance-cv
 ```
 
 ---
