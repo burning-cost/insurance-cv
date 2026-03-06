@@ -3,7 +3,7 @@
 Temporal cross-validation for insurance pricing models. Walk-forward splits that respect policy year, accident year, and IBNR development structure.
 
 ```bash
-uv pip install insurance-cv
+uv add insurance-cv
 ```
 
 ---
@@ -41,12 +41,14 @@ All generators return `TemporalSplit` objects and yield `(train_idx, test_idx)` 
 ## Quickstart
 
 ```python
-import pandas as pd
+import polars as pl
 from insurance_cv import walk_forward_split
 from insurance_cv.diagnostics import temporal_leakage_check, split_summary
 from insurance_cv.splits import InsuranceCV
 
 # df has an 'inception_date' column and several years of policy data
+df = pl.read_parquet("policies.parquet")
+
 splits = walk_forward_split(
     df,
     date_col="inception_date",
@@ -81,7 +83,7 @@ scores = cross_val_score(model, X, y, cv=cv, scoring="neg_mean_poisson_deviance"
 
 ```python
 walk_forward_split(
-    df: pd.DataFrame,
+    df,
     date_col: str,
     min_train_months: int = 12,
     test_months: int = 3,
@@ -94,13 +96,13 @@ Generates an expanding-window walk-forward split. The earliest data is always in
 
 Setting `step_months == test_months` gives non-overlapping test windows (the usual choice for insurance). Smaller values increase fold count but introduce correlation between adjacent test periods.
 
-For long-tail lines, `ibnr_buffer_months` should be 12–24 months. For motor it is typically 3–6 months.
+For long-tail lines, `ibnr_buffer_months` should be 12-24 months. For motor it is typically 3-6 months.
 
 ### `policy_year_split`
 
 ```python
 policy_year_split(
-    df: pd.DataFrame,
+    df,
     date_col: str,
     n_years_train: int,
     n_years_test: int = 1,
@@ -108,13 +110,13 @@ policy_year_split(
 ) -> list[TemporalSplit]
 ```
 
-Splits aligned to 1 Jan – 31 Dec policy year boundaries. Use this when your rate changes are annual and you want clean year-aligned train/test boundaries. There is no IBNR buffer because the year boundary is treated as a natural development cutoff - if you need one, adjust `n_years_train` to leave a gap year.
+Splits aligned to 1 Jan - 31 Dec policy year boundaries. Use this when your rate changes are annual and you want clean year-aligned train/test boundaries. There is no IBNR buffer because the year boundary is treated as a natural development cutoff - if you need one, adjust `n_years_train` to leave a gap year.
 
 ### `accident_year_split`
 
 ```python
 accident_year_split(
-    df: pd.DataFrame,
+    df,
     date_col: str,
     development_col: str,
     min_development_months: int = 12,
@@ -128,10 +130,10 @@ Generates one fold per accident year, filtering out years where median claim dev
 ```python
 TemporalSplit(
     date_col: str,
-    train_start: pd.Timestamp,
-    train_end: pd.Timestamp,
-    test_start: pd.Timestamp,
-    test_end: pd.Timestamp,
+    train_start,
+    train_end,
+    test_start,
+    test_end,
     ibnr_buffer_months: int = 0,
     label: str = "",
 )
@@ -142,7 +144,7 @@ A single split definition. Call `.get_indices(df)` to get `(train_idx, test_idx)
 ### `InsuranceCV`
 
 ```python
-InsuranceCV(splits: list[TemporalSplit], df: pd.DataFrame)
+InsuranceCV(splits: list[TemporalSplit], df)
 ```
 
 Wraps a list of `TemporalSplit` objects as a sklearn-compatible CV splitter. Implements `split()` and `get_n_splits()`. Pass to `cross_val_score`, `GridSearchCV`, or any other sklearn utility that accepts a CV splitter.
@@ -152,7 +154,7 @@ Wraps a list of `TemporalSplit` objects as a sklearn-compatible CV splitter. Imp
 ```python
 temporal_leakage_check(
     splits: list[TemporalSplit],
-    df: pd.DataFrame,
+    df,
     date_col: str,
 ) -> dict[str, list[str]]
 ```
@@ -164,9 +166,9 @@ Returns `{"errors": [...], "warnings": [...]}`. Run this before any model fittin
 ```python
 split_summary(
     splits: list[TemporalSplit],
-    df: pd.DataFrame,
+    df,
     date_col: str,
-) -> pd.DataFrame
+) -> pl.DataFrame
 ```
 
 Returns a DataFrame with one row per fold: fold number, train/test sizes, actual date boundaries, gap days, and IBNR buffer months. Useful for confirming that your splits look sensible before committing compute to model fitting.
@@ -181,12 +183,12 @@ Rough guidelines by line:
 
 | Line | Typical buffer |
 |---|---|
-| Motor own damage | 3–6 months |
-| Motor third party property | 6–12 months |
-| Motor third party bodily injury | 12–24 months |
-| Home buildings | 6–12 months |
-| Employers' liability | 24–36 months |
-| Professional indemnity | 24–48 months |
+| Motor own damage | 3-6 months |
+| Motor third party property | 6-12 months |
+| Motor third party bodily injury | 12-24 months |
+| Home buildings | 6-12 months |
+| Employers' liability | 24-36 months |
+| Professional indemnity | 24-48 months |
 
 These are starting points. The right value depends on your claims handling speed, the proportion of large/complex claims, and how you define your loss target (paid vs. incurred vs. ultimate).
 
