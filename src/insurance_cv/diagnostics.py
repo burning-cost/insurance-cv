@@ -10,16 +10,18 @@ checkable.
 from __future__ import annotations
 
 import warnings
+from typing import Union
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
-from .splits import TemporalSplit
+from .splits import AnyFrame, TemporalSplit, _to_date_series
 
 
 def temporal_leakage_check(
     splits: list[TemporalSplit],
-    df: pd.DataFrame,
+    df: AnyFrame,
     date_col: str,
 ) -> dict[str, list[str]]:
     """
@@ -32,7 +34,7 @@ def temporal_leakage_check(
     ----------
     splits : list of TemporalSplit
         Splits to validate.
-    df : pd.DataFrame
+    df : pl.DataFrame or pd.DataFrame
         The full dataset.
     date_col : str
         Date column used to assign rows.
@@ -49,7 +51,7 @@ def temporal_leakage_check(
     """
     errors: list[str] = []
     warnings_list: list[str] = []
-    dates = pd.to_datetime(df[date_col])
+    dates = _to_date_series(df, date_col)
 
     for i, split in enumerate(splits):
         train_idx, test_idx = split.get_indices(df)
@@ -98,9 +100,9 @@ def temporal_leakage_check(
 
 def split_summary(
     splits: list[TemporalSplit],
-    df: pd.DataFrame,
+    df: AnyFrame,
     date_col: str,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """
     Return a summary DataFrame with one row per fold.
 
@@ -130,14 +132,14 @@ def split_summary(
     Parameters
     ----------
     splits : list of TemporalSplit
-    df : pd.DataFrame
+    df : pl.DataFrame or pd.DataFrame
     date_col : str
 
     Returns
     -------
-    pd.DataFrame
+    pl.DataFrame
     """
-    dates = pd.to_datetime(df[date_col])
+    dates = _to_date_series(df, date_col)
     rows: list[dict] = []
 
     for i, split in enumerate(splits):
@@ -145,22 +147,22 @@ def split_summary(
 
         if len(train_idx) > 0:
             train_dates = dates.iloc[train_idx]
-            actual_train_start = train_dates.min()
-            actual_train_end = train_dates.max()
+            actual_train_start = train_dates.min().date()
+            actual_train_end = train_dates.max().date()
         else:
-            actual_train_start = pd.NaT
-            actual_train_end = pd.NaT
+            actual_train_start = None
+            actual_train_end = None
 
         if len(test_idx) > 0:
             test_dates = dates.iloc[test_idx]
-            actual_test_start = test_dates.min()
-            actual_test_end = test_dates.max()
+            actual_test_start = test_dates.min().date()
+            actual_test_end = test_dates.max().date()
         else:
-            actual_test_start = pd.NaT
-            actual_test_end = pd.NaT
+            actual_test_start = None
+            actual_test_end = None
 
         gap_days: int | None = None
-        if pd.notna(actual_train_end) and pd.notna(actual_test_start):
+        if actual_train_end is not None and actual_test_start is not None:
             gap_days = (actual_test_start - actual_train_end).days
 
         rows.append(
@@ -169,13 +171,13 @@ def split_summary(
                 "label": split.label or f"fold-{i + 1}",
                 "train_n": len(train_idx),
                 "test_n": len(test_idx),
-                "train_start": actual_train_start.date() if pd.notna(actual_train_start) else None,
-                "train_end": actual_train_end.date() if pd.notna(actual_train_end) else None,
-                "test_start": actual_test_start.date() if pd.notna(actual_test_start) else None,
-                "test_end": actual_test_end.date() if pd.notna(actual_test_end) else None,
+                "train_start": actual_train_start,
+                "train_end": actual_train_end,
+                "test_start": actual_test_start,
+                "test_end": actual_test_end,
                 "gap_days": gap_days,
                 "ibnr_buffer_months": split.ibnr_buffer_months,
             }
         )
 
-    return pd.DataFrame(rows)
+    return pl.DataFrame(rows)

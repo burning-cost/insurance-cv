@@ -6,12 +6,14 @@ The tests verify the properties that matter in production:
 - IBNR buffer is enforced and creates a real gap in the data
 - sklearn compatibility so these splitters work with GridSearchCV etc.
 - Sensible error handling for edge cases
+- Both polars and pandas DataFrames are accepted as input
 """
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 
 from insurance_cv import (
@@ -35,8 +37,30 @@ def make_motor_df(
     n: int = 5000,
     date_col: str = "inception_date",
     seed: int = 42,
+) -> pl.DataFrame:
+    """Synthetic motor policy dataset as a Polars DataFrame."""
+    rng = np.random.default_rng(seed)
+    dates = pd.date_range(start, end, freq="D")
+    sampled = pd.to_datetime(rng.choice(dates, size=n, replace=True))
+    # Build polars directly
+    df = pl.DataFrame(
+        {
+            date_col: sampled.tolist(),
+            "premium": rng.uniform(300, 1200, n).tolist(),
+            "claim_count": rng.poisson(0.08, n).tolist(),
+        }
+    ).sort(date_col)
+    return df
+
+
+def make_motor_df_pandas(
+    start: str = "2018-01-01",
+    end: str = "2023-12-31",
+    n: int = 5000,
+    date_col: str = "inception_date",
+    seed: int = 42,
 ) -> pd.DataFrame:
-    """Synthetic motor policy dataset."""
+    """Synthetic motor policy dataset as a Pandas DataFrame (bridge test)."""
     rng = np.random.default_rng(seed)
     dates = pd.date_range(start, end, freq="D")
     sampled = rng.choice(dates, size=n, replace=True)
@@ -55,20 +79,20 @@ def make_liability_df(
     end: str = "2022-12-31",
     n: int = 3000,
     seed: int = 7,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Synthetic liability dataset with development months column."""
     rng = np.random.default_rng(seed)
     dates = pd.date_range(start, end, freq="D")
     sampled = pd.Series(pd.to_datetime(rng.choice(dates, size=n, replace=True)))
     valuation = pd.Timestamp("2023-06-30")
-    development_months = ((valuation - sampled) / pd.Timedelta(days=30.4)).astype(int)
-    return pd.DataFrame(
+    development_months = ((valuation - sampled) / pd.Timedelta(days=30.4)).astype(int).clip(lower=0)
+    return pl.DataFrame(
         {
-            "accident_date": sampled,
-            "development_months": development_months.clip(lower=0),
-            "incurred": rng.exponential(5000, n),
+            "accident_date": sampled.tolist(),
+            "development_months": development_months.tolist(),
+            "incurred": rng.exponential(5000, n).tolist(),
         }
-    ).reset_index(drop=True)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +115,20 @@ class TestTemporalSplit:
         assert len(test_idx) > 0
         assert len(np.intersect1d(train_idx, test_idx)) == 0
 
+    def test_basic_index_split_pandas(self) -> None:
+        """Pandas DataFrame input should also work."""
+        df = make_motor_df_pandas()
+        split = TemporalSplit(
+            date_col="inception_date",
+            train_start=pd.Timestamp("2018-01-01"),
+            train_end=pd.Timestamp("2021-12-31"),
+            test_start=pd.Timestamp("2022-01-01"),
+            test_end=pd.Timestamp("2022-12-31"),
+        )
+        train_idx, test_idx = split.get_indices(df)
+        assert len(train_idx) > 0
+        assert len(test_idx) > 0
+
     def test_rejects_overlapping_dates(self) -> None:
         with pytest.raises(ValueError, match="must be before test_start"):
             TemporalSplit(
@@ -111,8 +149,10 @@ class TestTemporalSplit:
             test_end=pd.Timestamp("2021-06-30"),
         )
         train_idx, test_idx = split.get_indices(df)
-        train_dates = df["inception_date"].iloc[train_idx]
-        test_dates = df["inception_date"].iloc[test_idx]
+        # Extract date values via pandas for comparison
+        dates = df["inception_date"].to_pandas()
+        train_dates = pd.to_datetime(dates.iloc[train_idx])
+        test_dates = pd.to_datetime(dates.iloc[test_idx])
         assert train_dates.max() <= pd.Timestamp("2020-06-30")
         assert test_dates.min() >= pd.Timestamp("2021-01-01")
 
@@ -149,7 +189,7 @@ class TestWalkForwardSplit:
             date_col="inception_date",
             ibnr_buffer_months=buffer_months,
         )
-        dates = pd.to_datetime(df["inception_date"])
+        dates = pd.to_datetime(df["inception_date"].to_pandas())
         for split in splits:
             train_idx, test_idx = split.get_indices(df)
             if len(train_idx) == 0 or len(test_idx) == 0:
@@ -183,6 +223,7 @@ class TestWalkForwardSplit:
         df = make_motor_df()
         splits = walk_forward_split(df, date_col="inception_date")
         summary = split_summary(splits, df, date_col="inception_date")
+        assert isinstance(summary, pl.DataFrame)
         assert len(summary) == len(splits)
         expected_cols = {"fold", "train_n", "test_n", "gap_days"}
         assert expected_cols.issubset(set(summary.columns))
@@ -193,6 +234,14 @@ class TestWalkForwardSplit:
         splits = walk_forward_split(
             df, date_col="inception_date", ibnr_buffer_months=0
         )
+        result = temporal_leakage_check(splits, df, date_col="inception_date")
+        assert result["errors"] == []
+
+    def test_pandas_input_accepted(self) -> None:
+        """walk_forward_split should accept pandas DataFrames too."""
+        df = make_motor_df_pandas()
+        splits = walk_forward_split(df, date_col="inception_date")
+        assert len(splits) >= 2
         result = temporal_leakage_check(splits, df, date_col="inception_date")
         assert result["errors"] == []
 
@@ -217,7 +266,7 @@ class TestPolicyYearSplit:
     def test_year_boundaries_correct(self) -> None:
         df = make_motor_df()
         splits = policy_year_split(df, date_col="inception_date", n_years_train=3)
-        dates = pd.to_datetime(df["inception_date"])
+        dates = pd.to_datetime(df["inception_date"].to_pandas())
         for split in splits:
             train_idx, test_idx = split.get_indices(df)
             if len(train_idx) == 0 or len(test_idx) == 0:
@@ -261,16 +310,17 @@ class TestAccidentYearSplit:
     def test_immature_years_excluded(self) -> None:
         """Most recent accident year should not appear as test when dev is low."""
         rng = np.random.default_rng(99)
-        # Fabricate a dataset where 2023 has almost no development
         base = make_liability_df(end="2022-12-31")
-        recent = pd.DataFrame(
+        # Recent rows with only 1 month of development — immature
+        recent_dates = pd.date_range("2023-01-01", "2023-06-30", freq="ME")
+        recent = pl.DataFrame(
             {
-                "accident_date": pd.date_range("2023-01-01", "2023-06-30", freq="ME"),
-                "development_months": [1] * 6,  # only 1 month dev — immature
-                "incurred": rng.exponential(5000, 6),
+                "accident_date": recent_dates.tolist(),
+                "development_months": [1] * 6,
+                "incurred": rng.exponential(5000, 6).tolist(),
             }
         )
-        df = pd.concat([base, recent], ignore_index=True)
+        df = pl.concat([base, recent])
         splits = accident_year_split(
             df,
             date_col="accident_date",
@@ -285,9 +335,9 @@ class TestAccidentYearSplit:
 
     def test_insufficient_qualified_years_raises(self) -> None:
         """Only one qualifying year means we can't form a train/test pair."""
-        df = pd.DataFrame(
+        df = pl.DataFrame(
             {
-                "accident_date": pd.date_range("2022-01-01", "2022-12-31", freq="ME"),
+                "accident_date": pd.date_range("2022-01-01", "2022-12-31", freq="ME").tolist(),
                 "development_months": [24] * 12,
                 "incurred": [10000.0] * 12,
             }
@@ -336,8 +386,8 @@ class TestSklearnCompatibility:
             step_months=6,
         )
         cv = InsuranceCV(splits, df)
-        X = df[["premium"]].values
-        y = df["claim_count"].values
+        X = df.select("premium").to_numpy()
+        y = df.select("claim_count").to_numpy().ravel()
         # Should not raise
         scores = cross_val_score(Ridge(), X, y, cv=cv, scoring="neg_mean_squared_error")
         assert len(scores) == len(splits)
@@ -356,21 +406,8 @@ class TestDiagnostics:
         assert result["errors"] == []
 
     def test_leakage_check_detects_overlap(self) -> None:
-        """Manually construct a bad split and confirm detection."""
+        """Walk-forward splits should be clean when built correctly."""
         df = make_motor_df()
-        bad_split = TemporalSplit(
-            date_col="inception_date",
-            train_start=pd.Timestamp("2018-01-01"),
-            train_end=pd.Timestamp("2021-12-31 23:59:59"),
-            # test_start intentionally before train_end — bypassing __post_init__
-            # by setting the attribute directly after construction
-            test_start=pd.Timestamp("2022-01-01"),
-            test_end=pd.Timestamp("2022-12-31"),
-        )
-        # Manufacture overlap by manually giving a split where train and test
-        # share the same date range at the boundary
-        # Since TemporalSplit.__post_init__ would reject true overlap,
-        # we test via a tight boundary where dates might straddle
         clean_splits = walk_forward_split(df, "inception_date")
         result = temporal_leakage_check(clean_splits, df, "inception_date")
         assert result["errors"] == [], "Walk-forward splits should be clean"
@@ -381,4 +418,11 @@ class TestDiagnostics:
             df, date_col="inception_date", ibnr_buffer_months=3
         )
         summary = split_summary(splits, df, date_col="inception_date")
+        assert isinstance(summary, pl.DataFrame)
         assert (summary["gap_days"] >= 0).all()
+
+    def test_split_summary_returns_polars(self) -> None:
+        df = make_motor_df()
+        splits = walk_forward_split(df, date_col="inception_date")
+        summary = split_summary(splits, df, date_col="inception_date")
+        assert isinstance(summary, pl.DataFrame)

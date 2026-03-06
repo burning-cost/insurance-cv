@@ -36,11 +36,27 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Generator, Iterator
+from typing import Generator, Iterator, Union
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.base import BaseEstimator
+
+# Type alias for DataFrames accepted by public functions
+AnyFrame = Union[pl.DataFrame, pd.DataFrame]
+
+
+def _to_date_series(df: AnyFrame, col: str) -> pd.Series:
+    """
+    Extract a date column from either a Polars or Pandas DataFrame,
+    returning a pandas Series of datetime64 values for date arithmetic.
+    """
+    if isinstance(df, pl.DataFrame):
+        # Convert the single column to pandas for date arithmetic
+        return pd.to_datetime(df[col].to_pandas())
+    else:
+        return pd.to_datetime(df[col])
 
 
 @dataclass
@@ -83,13 +99,13 @@ class TemporalSplit:
                 "Temporal leakage would occur."
             )
 
-    def get_indices(self, df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    def get_indices(self, df: AnyFrame) -> tuple[np.ndarray, np.ndarray]:
         """
         Return (train_indices, test_indices) as integer index arrays.
 
         Parameters
         ----------
-        df : pd.DataFrame
+        df : pl.DataFrame or pd.DataFrame
             The full dataset. Must contain self.date_col.
 
         Returns
@@ -97,7 +113,7 @@ class TemporalSplit:
         train_idx : np.ndarray of int
         test_idx : np.ndarray of int
         """
-        dates = pd.to_datetime(df[self.date_col])
+        dates = _to_date_series(df, self.date_col)
         train_mask = (dates >= self.train_start) & (dates <= self.train_end)
         test_mask = (dates >= self.test_start) & (dates <= self.test_end)
         return (
@@ -122,7 +138,7 @@ def _period_start(ts: pd.Timestamp) -> pd.Timestamp:
 
 
 def walk_forward_split(
-    df: pd.DataFrame,
+    df: AnyFrame,
     date_col: str,
     min_train_months: int = 12,
     test_months: int = 3,
@@ -144,7 +160,7 @@ def walk_forward_split(
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pl.DataFrame or pd.DataFrame
         Must contain ``date_col``.
     date_col : str
         Date column (policy inception date or accident date).
@@ -173,7 +189,7 @@ def walk_forward_split(
     ValueError
         If there is insufficient data for even one fold.
     """
-    dates = pd.to_datetime(df[date_col])
+    dates = _to_date_series(df, date_col)
     global_start = _period_start(dates.min())
     global_end = _period_end(dates.max())
 
@@ -224,7 +240,7 @@ def walk_forward_split(
 
 
 def policy_year_split(
-    df: pd.DataFrame,
+    df: AnyFrame,
     date_col: str,
     n_years_train: int,
     n_years_test: int = 1,
@@ -239,7 +255,7 @@ def policy_year_split(
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pl.DataFrame or pd.DataFrame
         Must contain ``date_col``.
     date_col : str
         Policy inception date column.
@@ -254,9 +270,9 @@ def policy_year_split(
     -------
     List of TemporalSplit objects.
     """
-    dates = pd.to_datetime(df[date_col])
-    min_year = dates.dt.year.min()
-    max_year = dates.dt.year.max()
+    dates = _to_date_series(df, date_col)
+    min_year = int(dates.dt.year.min())
+    max_year = int(dates.dt.year.max())
 
     splits: list[TemporalSplit] = []
     fold = 1
@@ -306,7 +322,7 @@ def policy_year_split(
 
 
 def accident_year_split(
-    df: pd.DataFrame,
+    df: AnyFrame,
     date_col: str,
     development_col: str,
     min_development_months: int = 12,
@@ -327,7 +343,7 @@ def accident_year_split(
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pl.DataFrame or pd.DataFrame
         Must contain ``date_col`` and ``development_col``.
     date_col : str
         Accident date column.
@@ -341,8 +357,12 @@ def accident_year_split(
     -------
     List of TemporalSplit objects.
     """
-    dates = pd.to_datetime(df[date_col])
-    development = pd.to_numeric(df[development_col], errors="coerce")
+    dates = _to_date_series(df, date_col)
+
+    if isinstance(df, pl.DataFrame):
+        development = pd.to_numeric(df[development_col].to_pandas(), errors="coerce")
+    else:
+        development = pd.to_numeric(df[development_col], errors="coerce")
 
     accident_years = sorted(dates.dt.year.unique())
 
@@ -404,7 +424,7 @@ class InsuranceCV(BaseEstimator):
     ----------
     splits : list of TemporalSplit
         Pre-computed splits, e.g. from ``walk_forward_split()``.
-    df : pd.DataFrame
+    df : pl.DataFrame or pd.DataFrame
         The full dataset. Required so ``split()`` can resolve indices.
 
     Examples
@@ -413,14 +433,14 @@ class InsuranceCV(BaseEstimator):
     >>> cross_val_score(model, X, y, cv=cv)
     """
 
-    def __init__(self, splits: list[TemporalSplit], df: pd.DataFrame) -> None:
+    def __init__(self, splits: list[TemporalSplit], df: AnyFrame) -> None:
         self.splits = splits
         self.df = df
 
     def split(
         self,
-        X: np.ndarray | pd.DataFrame,
-        y: np.ndarray | pd.Series | None = None,
+        X: np.ndarray | AnyFrame,
+        y: np.ndarray | None = None,
         groups: np.ndarray | None = None,
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         for s in self.splits:
@@ -428,8 +448,8 @@ class InsuranceCV(BaseEstimator):
 
     def get_n_splits(
         self,
-        X: np.ndarray | pd.DataFrame | None = None,
-        y: np.ndarray | pd.Series | None = None,
+        X: np.ndarray | AnyFrame | None = None,
+        y: np.ndarray | None = None,
         groups: np.ndarray | None = None,
     ) -> int:
         return len(self.splits)
