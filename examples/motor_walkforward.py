@@ -8,7 +8,7 @@ training data, and a 3-month IBNR buffer prevents partially-developed claims
 from polluting the test evaluation.
 
 Run this on Databricks or any environment with CatBoost installed:
-    uv pip install insurance-cv catboost polars
+    uv add insurance-cv catboost polars
 """
 
 import numpy as np
@@ -126,7 +126,7 @@ try:
     print(f"CatBoost Poisson deviance across {len(scores)} folds: {-scores.mean():.4f} (+/- {scores.std():.4f})")
 
 except ImportError:
-    print("CatBoost not installed - skipping model fit. Install with: uv pip install catboost")
+    print("CatBoost not installed - skipping model fit. Install with: uv add catboost")
 
 # ---------------------------------------------------------------------------
 # Manual fold iteration (if you need exposure-weighted evaluation)
