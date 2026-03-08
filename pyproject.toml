@@ -32,8 +32,8 @@ dependencies = [
 dev = ["pytest>=8.0", "pytest-cov"]
 
 [project.urls]
-Repository = "https://github.com/burningcost/insurance-cv"
-Issues = "https://github.com/burningcost/insurance-cv/issues"
+Repository = "https://github.com/burning-cost/insurance-cv"
+Issues = "https://github.com/burning-cost/insurance-cv/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/insurance_cv"]

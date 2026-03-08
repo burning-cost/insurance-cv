@@ -197,7 +197,7 @@ These are starting points. The right value depends on your claims handling speed
 ## Development
 
 ```bash
-git clone https://github.com/burningcost/insurance-cv
+git clone https://github.com/burning-cost/insurance-cv
 cd insurance-cv
 uv sync --dev
 uv run pytest -v
