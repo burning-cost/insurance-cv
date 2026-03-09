@@ -1,4 +1,5 @@
 # insurance-cv
+[![Tests](https://github.com/burning-cost/insurance-cv/actions/workflows/ci.yml/badge.svg)](https://github.com/burning-cost/insurance-cv/actions/workflows/ci.yml)
 
 Temporal cross-validation for insurance pricing models. Walk-forward splits that respect policy year, accident year, and IBNR development structure.
 
