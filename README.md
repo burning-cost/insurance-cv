@@ -1,7 +1,10 @@
 # insurance-cv
 [![Tests](https://github.com/burning-cost/insurance-cv/actions/workflows/ci.yml/badge.svg)](https://github.com/burning-cost/insurance-cv/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/insurance-cv)](https://pypi.org/project/insurance-cv/)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-Temporal cross-validation for insurance pricing models. Walk-forward splits that respect policy year, accident year, and IBNR development structure.
+Temporal cross-validation for insurance pricing models. Walk-forward splits that respect policy year, accident year, and IBNR development structure - because standard k-fold gives you overoptimistic CV scores that don't survive contact with a live rating year.
 
 ```bash
 uv add insurance-cv
@@ -20,6 +23,12 @@ K-fold cross-validation randomly partitions data into folds. For insurance prici
 **Seasonal confounding.** Motor claims peak in winter. Property claims follow weather cycles. If a randomly-selected test fold contains a disproportionate share of December policies, the test loss will look different to what you'd see prospectively. A prospective evaluation should test on a contiguous future period with the same seasonal mix the model will face in deployment.
 
 The result of using k-fold on insurance data is a model that looks better in CV than it performs in the rating year. Prospective monitoring then shows a gap between modelled and actual loss ratios that is partly attributable to the leaky evaluation methodology.
+
+---
+
+## Blog post
+
+[Why Your Cross-Validation is Lying to You](https://burning-cost.github.io/2026/03/06/why-your-cross-validation-is-lying-to-you/)
 
 ---
 
@@ -192,6 +201,43 @@ Rough guidelines by line:
 | Professional indemnity | 24-48 months |
 
 These are starting points. The right value depends on your claims handling speed, the proportion of large/complex claims, and how you define your loss target (paid vs. incurred vs. ultimate).
+
+---
+
+## Related Burning Cost libraries
+
+- **[insurance-monitoring](https://github.com/burning-cost/insurance-monitoring)** - Once you have a properly evaluated model and deploy it, use insurance-monitoring to track Gini drift, PSI, and A/E ratios prospectively. The walk-forward splits here produce the baseline metrics; monitoring tracks how the model holds up after deployment.
+- **[insurance-conformal](https://github.com/burning-cost/insurance-conformal)** - Prediction intervals for your GBM. Uses temporal splits (same logic as this library) to calibrate the conformal quantile on recent data.
+
+**Model building**
+
+| Library | Description |
+|---------|-------------|
+| [shap-relativities](https://github.com/burning-cost/shap-relativities) | Extract rating relativities from GBMs using SHAP |
+| [insurance-interactions](https://github.com/burning-cost/insurance-interactions) | Automated GLM interaction detection via CANN and NID scores |
+
+**Uncertainty quantification**
+
+| Library | Description |
+|---------|-------------|
+| [insurance-conformal](https://github.com/burning-cost/insurance-conformal) | Distribution-free prediction intervals for Tweedie models |
+| [insurance-distributional](https://github.com/burning-cost/insurance-distributional) | Full conditional distribution per risk: mean, variance, CoV |
+
+**Deployment and optimisation**
+
+| Library | Description |
+|---------|-------------|
+| [rate-optimiser](https://github.com/burning-cost/rate-optimiser) | Constrained rate change optimisation with FCA PS21/5 compliance |
+| [insurance-demand](https://github.com/burning-cost/insurance-demand) | Conversion, retention, and price elasticity modelling |
+
+**Governance**
+
+| Library | Description |
+|---------|-------------|
+| [insurance-fairness](https://github.com/burning-cost/insurance-fairness) | Proxy discrimination auditing for UK insurance models |
+| [insurance-monitoring](https://github.com/burning-cost/insurance-monitoring) | Model monitoring: PSI, A/E ratios, Gini drift test |
+
+[All libraries](https://burning-cost.github.io)
 
 ---
 
