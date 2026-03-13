@@ -241,6 +241,18 @@ These are starting points. The right value depends on your claims handling speed
 
 ---
 
+## Capabilities
+
+The notebook at `notebooks/demo_insurance_cv.py` runs a complete demonstration on a 5-year synthetic UK motor portfolio with known seasonal and trend structure, and shows:
+
+- **Walk-forward vs random k-fold gap**: Poisson deviance is measurably lower (better-looking) under random k-fold because future data leaks into training. Walk-forward gives the honest prospective estimate.
+- **Per-fold trajectory**: Walk-forward fold scores trend with the data's temporal structure; random k-fold averages across all periods and hides this signal.
+- **IBNR buffer effect**: Test set size and cleanliness trade off against each other. The notebook shows how buffer length from 0 to 12 months changes both.
+- **Policy-year splits**: Clean 1 Jan boundaries keep training and test sets on opposite sides of rate changes, demonstrated on 5 policy years.
+- **sklearn drop-in compatibility**: InsuranceCV passes directly to cross_val_score with no code changes beyond swapping the CV object.
+
+---
+
 ## Development
 
 ```bash
