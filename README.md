@@ -50,19 +50,37 @@ All generators return `TemporalSplit` objects and yield `(train_idx, test_idx)` 
 
 ## Quickstart
 
+This example is self-contained — no external files needed.
+
 ```python
 import polars as pl
+import numpy as np
+from datetime import date, timedelta
 from insurance_cv import walk_forward_split
 from insurance_cv.diagnostics import temporal_leakage_check, split_summary
 from insurance_cv.splits import InsuranceCV
 
-# df has an 'inception_date' column and several years of policy data
-df = pl.read_parquet("policies.parquet")
+# Generate a synthetic UK motor portfolio: 1000 policies over 3 years
+rng = np.random.default_rng(42)
+n = 1_000
+start = date(2021, 1, 1)
+inception_dates = [start + timedelta(days=int(d)) for d in rng.integers(0, 365 * 3, n)]
+
+df = pl.DataFrame({
+    "policy_id": [f"POL{i:05d}" for i in range(n)],
+    "inception_date": inception_dates,
+    "exposure": rng.uniform(0.1, 1.0, n).round(4).tolist(),
+    "claim_count": rng.poisson(0.08, n).tolist(),
+    "claim_amount": (rng.exponential(1500, n) * rng.binomial(1, 0.08, n)).round(2).tolist(),
+    "vehicle_age": rng.integers(0, 15, n).tolist(),
+    "driver_age": rng.integers(18, 80, n).tolist(),
+    "ncd_years": rng.integers(0, 9, n).tolist(),
+}).with_columns(pl.col("inception_date").cast(pl.Date))
 
 splits = walk_forward_split(
     df,
     date_col="inception_date",
-    min_train_months=18,    # need at least 1.5 years to cover seasonality
+    min_train_months=12,    # need at least a year to cover seasonality
     test_months=6,          # evaluate on 6-month windows
     step_months=6,          # non-overlapping test periods
     ibnr_buffer_months=3,   # exclude claims in the 3 months before each test window
@@ -75,14 +93,20 @@ if check["errors"]:
 
 print(split_summary(splits, df, date_col="inception_date"))
 # fold  train_n  test_n  train_end   test_start  gap_days
-#    1     2841     957  2019-12-31  2020-04-01        91
-#    2     4189    1002  2020-06-30  2020-10-01        93
+#    1      312     167  2021-12-31  2022-04-01        91
+#    2      479     161  2022-06-30  2022-10-01        93
 #  ...
 
 # sklearn-compatible: pass to cross_val_score or GridSearchCV
 from sklearn.model_selection import cross_val_score
 cv = InsuranceCV(splits, df)
 scores = cross_val_score(model, X, y, cv=cv, scoring="neg_mean_poisson_deviance")
+```
+
+If you already have policy data in a parquet file, replace the synthetic DataFrame block with:
+
+```python
+df = pl.read_parquet("policies.parquet")
 ```
 
 ---
