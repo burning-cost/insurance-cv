@@ -275,7 +275,7 @@ Run `notebooks/benchmark.py` on Databricks to reproduce.
 
 | Library | Description |
 |---------|-------------|
-| [rate-optimiser](https://github.com/burning-cost/rate-optimiser) | Constrained rate change optimisation with FCA PS21/5 compliance |
+| [insurance-optimise](https://github.com/burning-cost/insurance-optimise) | Constrained rate change optimisation with FCA PS21/5 compliance |
 | [insurance-demand](https://github.com/burning-cost/insurance-demand) | Conversion, retention, and price elasticity modelling |
 
 **Governance**
