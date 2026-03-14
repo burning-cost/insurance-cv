@@ -260,6 +260,11 @@ Run `notebooks/benchmark.py` on Databricks to reproduce.
 
 ---
 
+
+## Databricks Notebook
+
+A ready-to-run Databricks notebook benchmarking this library against standard approaches is available in [burning-cost-examples](https://github.com/burning-cost/burning-cost-examples/blob/main/notebooks/temporal_cross_validation.py).
+
 ## Related Burning Cost libraries
 
 - **[insurance-monitoring](https://github.com/burning-cost/insurance-monitoring)** - Once you have a properly evaluated model and deploy it, use insurance-monitoring to track Gini drift, PSI, and A/E ratios prospectively. The walk-forward splits here produce the baseline metrics; monitoring tracks how the model holds up after deployment.
