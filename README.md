@@ -322,6 +322,16 @@ Tests are designed to run on Databricks (serverless) for the compute-heavy cases
 
 ---
 
+
+## Related Libraries
+
+| Library | What it does |
+|---------|-------------|
+| [shap-relativities](https://github.com/burning-cost/shap-relativities) | Extract rating relativities from GBMs — combine with walk-forward CV to evaluate GBM-derived factor tables |
+| [insurance-conformal](https://github.com/burning-cost/insurance-conformal) | Conformal prediction intervals — uses temporal splits (same logic as this library) to calibrate coverage guarantees |
+| [insurance-monitoring](https://github.com/burning-cost/insurance-monitoring) | Model monitoring — walk-forward splits here produce the baseline metrics; monitoring tracks performance after deployment |
+| [insurance-datasets](https://github.com/burning-cost/insurance-datasets) | Synthetic UK insurance datasets with known DGPs — use to benchmark CV strategies against a controlled ground truth |
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
