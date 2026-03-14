@@ -98,7 +98,15 @@ print(split_summary(splits, df, date_col="inception_date"))
 #  ...
 
 # sklearn-compatible: pass to cross_val_score or GridSearchCV
+# Define X and y from the full dataframe (numeric features only for this example)
+from sklearn.linear_model import PoissonRegressor
 from sklearn.model_selection import cross_val_score
+import numpy as np
+
+X = df.select(["vehicle_age", "driver_age", "ncd_years"]).to_numpy()
+y = df["claim_count"].to_numpy().astype(float)
+model = PoissonRegressor()
+
 cv = InsuranceCV(splits, df)
 scores = cross_val_score(model, X, y, cv=cv, scoring="neg_mean_poisson_deviance")
 ```
