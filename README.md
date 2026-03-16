@@ -18,9 +18,10 @@ Benchmarked against random 5-fold KFold on synthetic UK motor insurance data —
 | Temporal leakage | Yes (future years in training folds) | No (verified by leakage check) |
 | Optimism bias vs true OOT | 0.002-0.015 deviance units | 50-80% closer to true OOT |
 | Fold-level variance | Low (averages across all periods) | Higher — shows degradation trend |
-| Structured audit trail | No | Yes (split_summary output) |
 
-The optimism bias from random KFold is driven by the frequency trend in the DGP: knowing future years helps predict past years, inflating apparent CV performance. Temporal CV gives the honest prospective estimate.
+Temporal walk-forward CV also produces a structured audit trail via `split_summary` output — Random KFold does not. This is a governance feature, not a performance metric.
+
+The optimism bias from random KFold is driven by the mild frequency trend in the synthetic dataset: knowing future years helps predict past years, inflating apparent CV performance. Temporal CV gives the honest prospective estimate.
 
 ---
 
@@ -60,7 +61,7 @@ Three split generators cover the main use cases:
 | `policy_year_split` | When rate changes align to policy year boundaries and you want clean PY-aligned folds. |
 | `accident_year_split` | Long-tail lines (liability, PI) where accident year development varies across the triangle. |
 
-All generators return `TemporalSplit` objects and yield `(train_idx, test_idx)` tuples that index into your DataFrame. They are also wrapped by `InsuranceCV`, which implements the sklearn `BaseCrossValidator` interface so you can pass them directly to `GridSearchCV`, `cross_val_score`, etc.
+All generators return `TemporalSplit` objects and yield `(train_idx, test_idx)` tuples that index into your DataFrame. They are also wrapped by `InsuranceCV`, which implements sklearn's CV splitter interface (`split` and `get_n_splits`) so you can pass them directly to `GridSearchCV`, `cross_val_score`, etc.
 
 ---
 
@@ -190,6 +191,21 @@ accident_year_split(
 
 Generates one fold per accident year, filtering out years where median claim development is below `min_development_months`. The `development_col` should contain months from accident date to valuation date. This is the right approach for liability and professional indemnity where the development triangle matters.
 
+`development_col` is a derived column you must pre-compute from your dates before calling `accident_year_split`. For Polars DataFrames:
+
+```python
+import polars as pl
+
+df = df.with_columns(
+    ((pl.col("valuation_date") - pl.col("accident_date")).dt.total_days() / 30.4)
+    .alias("development_months")
+)
+
+splits = accident_year_split(df, date_col="accident_date", development_col="development_months")
+```
+
+The 30.4 divisor converts days to approximate calendar months. Use your actual valuation date column name — for a single snapshot dataset this is often a constant.
+
 ### `TemporalSplit`
 
 ```python
@@ -271,9 +287,8 @@ The core question: which CV strategy produces an estimate closer to what the mod
 | Gap to true OOT deviance | measured at runtime | measured at runtime | 0.00000 |
 | Optimism bias (random − temporal) | measured at runtime | — | — |
 | Temporal leakage | Yes (future years in training folds) | No (verified by leakage check) | — |
-| Structured audit trail | No | Yes (split_summary output) | — |
 
-Expected results on this dataset: random KFold produces a CV deviance estimate that is 0.002–0.015 deviance units more optimistic than the true OOT performance. The temporal CV estimate is expected to be 50–80% closer to the true OOT deviance. The optimism bias is driven by the mild frequency trend in the DGP: knowing future years helps predict past years, inflating apparent CV performance under random splitting.
+Expected results on this dataset: random KFold produces a CV deviance estimate that is 0.002–0.015 deviance units more optimistic than the true OOT performance. The temporal CV estimate is expected to be 50–80% closer to the true OOT deviance. The optimism bias is driven by the mild frequency trend in the synthetic dataset: knowing future years helps predict past years, inflating apparent CV performance under random splitting.
 
 The temporal CV fold-level variance is typically 2–5x higher than random KFold, because each fold genuinely tests on a different time period rather than averaging across all periods. This higher variance is informative — it shows whether model performance degrades as the validation period moves further from the training window.
 
