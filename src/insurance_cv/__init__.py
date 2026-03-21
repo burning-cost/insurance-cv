@@ -7,6 +7,7 @@ wherever you need time-aware splits.
 """
 
 from .splits import (
+    InsuranceCV,
     TemporalSplit,
     walk_forward_split,
     policy_year_split,
@@ -15,6 +16,7 @@ from .splits import (
 from .diagnostics import temporal_leakage_check, split_summary
 
 __all__ = [
+    "InsuranceCV",
     "TemporalSplit",
     "walk_forward_split",
     "policy_year_split",
@@ -23,4 +25,4 @@ __all__ = [
     "split_summary",
 ]
 
-__version__ = "0.2.1"
+__version__ = "0.2.3"
