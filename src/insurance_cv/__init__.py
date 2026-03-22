@@ -25,4 +25,9 @@ __all__ = [
     "split_summary",
 ]
 
-__version__ = "0.2.3"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("insurance-cv")
+except PackageNotFoundError:
+    __version__ = "0.0.0"  # not installed
