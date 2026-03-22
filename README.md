@@ -77,6 +77,8 @@ All generators return `TemporalSplit` objects and yield `(train_idx, test_idx)` 
 
 ```bash
 uv add insurance-cv
+# or
+pip install insurance-cv
 ```
 
 ---
