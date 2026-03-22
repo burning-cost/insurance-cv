@@ -1,6 +1,7 @@
 # insurance-cv
 
 [![PyPI](https://img.shields.io/pypi/v/insurance-cv)](https://pypi.org/project/insurance-cv/)
+[![Downloads](https://img.shields.io/pypi/dm/insurance-cv)](https://pypi.org/project/insurance-cv/)
 [![Python](https://img.shields.io/pypi/pyversions/insurance-cv)](https://pypi.org/project/insurance-cv/)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
 [![License](https://img.shields.io/badge/license-BSD--3-blue)]()
