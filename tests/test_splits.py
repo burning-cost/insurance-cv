@@ -426,3 +426,24 @@ class TestDiagnostics:
         splits = walk_forward_split(df, date_col="inception_date")
         summary = split_summary(splits, df, date_col="inception_date")
         assert isinstance(summary, pl.DataFrame)
+
+    def test_insurance_cv_split_length_mismatch_raises(self) -> None:
+        """Passing X with wrong number of rows should raise ValueError."""
+        df = make_motor_df()
+        splits = walk_forward_split(df, date_col="inception_date")
+        cv = InsuranceCV(splits, df)
+        # X has one row too few
+        X_wrong = np.zeros((len(df) - 1, 1))
+        with pytest.raises(ValueError, match="rows"):
+            # Must consume the iterator to trigger the check
+            list(cv.split(X_wrong))
+
+    def test_insurance_cv_split_correct_length_does_not_raise(self) -> None:
+        """Passing X with matching number of rows must not raise."""
+        df = make_motor_df()
+        splits = walk_forward_split(df, date_col="inception_date")
+        cv = InsuranceCV(splits, df)
+        X_correct = np.zeros((len(df), 1))
+        # Should produce results without raising
+        results = list(cv.split(X_correct))
+        assert len(results) == len(splits)

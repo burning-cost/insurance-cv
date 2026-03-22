@@ -178,7 +178,7 @@ def walk_forward_split(
         Gap between train_end and test_start. Claims with accident dates in
         this window are excluded from both sets. For long-tail lines (liability,
         professional indemnity) this should be 12+ months. For motor it is
-        typically 3–6 months.
+        typically 3-6 months.
 
     Returns
     -------
@@ -247,7 +247,7 @@ def policy_year_split(
     step_years: int = 1,
 ) -> list[TemporalSplit]:
     """
-    Generate splits aligned to policy years (1 Jan – 31 Dec boundaries).
+    Generate splits aligned to policy years (1 Jan - 31 Dec boundaries).
 
     Policy-year alignment matters when you have rate changes at year boundaries
     - you don't want the model to see a post-rate-change test period trained on
@@ -315,7 +315,7 @@ def policy_year_split(
         raise ValueError(
             f"Cannot generate policy-year splits with {n_years_train} train years "
             f"and {n_years_test} test years from data spanning "
-            f"{min_year}–{max_year}."
+            f"{min_year}-{max_year}."
         )
 
     return splits
@@ -443,6 +443,42 @@ class InsuranceCV(BaseEstimator):
         y: np.ndarray | None = None,
         groups: np.ndarray | None = None,
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+        """Yield (train_indices, test_indices) pairs for each temporal split.
+
+        Split indices are always derived from the ``df`` DataFrame passed at
+        construction time, not from ``X``. This is intentional: insurance CV
+        splitters are date-based, and the date column lives in ``df``. The
+        ``X`` argument is present only for sklearn API compatibility.
+
+        Parameters
+        ----------
+        X :
+            Feature matrix (or DataFrame). Ignored for index computation, but
+            its length is checked against ``len(self.df)`` when provided. This
+            guards against accidentally passing a differently-sized matrix,
+            which would produce out-of-range indices.
+        y, groups :
+            Ignored (present for sklearn API compatibility).
+
+        Raises
+        ------
+        ValueError
+            If ``X`` is provided and ``len(X) != len(self.df)``. Split indices
+            are derived from the construction-time DataFrame; ``X`` must have
+            the same number of rows.
+        """
+        if X is not None:
+            try:
+                x_len = len(X)
+            except TypeError:
+                x_len = None
+            if x_len is not None and x_len != len(self.df):
+                raise ValueError(
+                    f"InsuranceCV.split() received X with {x_len} rows, but the "
+                    f"DataFrame passed at construction has {len(self.df)} rows. "
+                    "Split indices are derived from the construction-time DataFrame; "
+                    "X must have the same number of rows."
+                )
         for s in self.splits:
             yield s.get_indices(self.df)
 
