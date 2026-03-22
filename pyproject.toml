@@ -7,7 +7,7 @@ name = "insurance-cv"
 version = "0.2.3"
 description = "Temporal cross-validation for insurance pricing models"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
 requires-python = ">=3.10"
 authors = [{ name = "Burning Cost", email = "pricing.frontier@gmail.com" }]
 keywords = ["insurance", "cross-validation", "pricing", "machine-learning"]
