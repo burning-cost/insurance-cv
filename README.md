@@ -5,6 +5,8 @@
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
 [![License](https://img.shields.io/badge/license-BSD--3-blue)]()
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/burning-cost/insurance-cv/blob/main/notebooks/quickstart.ipynb)
+
 Temporal cross-validation for insurance pricing models — walk-forward splits that respect policy year, accident year, and IBNR development structure, because standard k-fold gives you overoptimistic CV scores that don't survive contact with a live rating year.
 
 ---
