@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "insurance-cv"
-version = "0.2.3"
+version = "0.2.4"
 description = "Temporal cross-validation for insurance pricing models"
 readme = "README.md"
 license = "MIT"
@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Office/Business :: Financial",
 ]
 dependencies = [
-    "numpy>=1.24",
+    "numpy>=1.25",
     "polars>=1.0",
     "pandas>=2.0",
     "scikit-learn>=1.3",
