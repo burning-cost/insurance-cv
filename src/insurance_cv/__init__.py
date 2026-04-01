@@ -1,9 +1,14 @@
 """
-insurance-cv: Temporal cross-validation for insurance pricing models.
+insurance-cv: Temporal and distributional cross-validation for insurance
+pricing models.
 
 Walk-forward splits that respect policy year, accident year, and IBNR
-development structure. Drop-in replacement for sklearn CV splitters
-wherever you need time-aware splits.
+development structure. Distributional splits that ensure rare events are
+proportionally represented in test sets. Feature screening via Chatterjee's
+Xi coefficient for nonlinear dependence detection.
+
+All splitters are drop-in replacements for sklearn CV splitters wherever
+you need time-aware or distribution-aware splits.
 """
 
 from .splits import (
@@ -14,6 +19,8 @@ from .splits import (
     accident_year_split,
 )
 from .diagnostics import temporal_leakage_check, split_summary
+from .distributional import SupportPointSplit
+from .feature_selection import ChatterjeeSelector
 
 __all__ = [
     "InsuranceCV",
@@ -23,6 +30,8 @@ __all__ = [
     "accident_year_split",
     "temporal_leakage_check",
     "split_summary",
+    "SupportPointSplit",
+    "ChatterjeeSelector",
 ]
 
 from importlib.metadata import version, PackageNotFoundError

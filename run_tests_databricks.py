@@ -24,16 +24,20 @@ from databricks.sdk.service.workspace import ImportFormat, Language
 w = WorkspaceClient()
 
 WORKSPACE_PATH = "/Workspace/insurance-cv-migration"
-PROJECT_ROOT = "/home/ralph/insurance-cv"
+PROJECT_ROOT = "/home/ralph/repos/insurance-cv"
 
 # Files to upload (relative to PROJECT_ROOT)
 UPLOAD_PATHS = [
     "src/insurance_cv/__init__.py",
     "src/insurance_cv/splits.py",
     "src/insurance_cv/diagnostics.py",
+    "src/insurance_cv/distributional.py",
+    "src/insurance_cv/feature_selection.py",
+    "src/insurance_cv/py.typed",
     "tests/__init__.py",
     "tests/test_splits.py",
-    "examples/motor_walkforward.py",
+    "tests/test_distributional.py",
+    "tests/test_feature_selection.py",
     "pyproject.toml",
     "README.md",
 ]

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "insurance-cv"
-version = "0.2.4"
-description = "Temporal cross-validation for insurance pricing models"
+version = "0.3.0"
+description = "Temporal and distributional cross-validation, and feature screening, for insurance pricing models"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -44,3 +44,8 @@ packages = ["src/insurance_cv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "databricks-sdk>=0.102.0",
+]
