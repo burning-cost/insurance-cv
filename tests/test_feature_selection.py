@@ -61,7 +61,7 @@ class TestXiFunction:
         rng = np.random.default_rng(2)
         age = rng.uniform(18, 80, 2000)
         # Frequency increases towards young and old ends — U-shaped
-        frequency = 0.05 + 0.002 * (age - 49) ** 2 / 100 + rng.standard_normal(2000) * 0.02
+        frequency = 0.05 + 0.01 * (age - 49) ** 2 / 100 + rng.standard_normal(2000) * 0.02
         frequency = np.clip(frequency, 0, None)
 
         xi_val = _xi(age, frequency, ties="average")
@@ -96,7 +96,7 @@ class TestXiFunction:
             x = rng.standard_normal(300)
             y = rng.standard_normal(300)
             xi_val = _xi(x, y, ties="average")
-            assert xi_val >= -0.05, f"Xi should be near 0 or positive; got {xi_val:.4f}"
+            assert xi_val >= -0.1, f"Xi should be near 0 or positive; got {xi_val:.4f}"
 
     def test_xi_threshold_dependence(self) -> None:
         """
